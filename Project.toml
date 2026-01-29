@@ -1,7 +1,7 @@
 name = "ModelingToolkitInputs"
 uuid = "9c47c465-b61a-4984-aca2-8d7e8f154266"
 authors = ["Brad Carman <bradleygcarman@outlook.com>"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
@@ -13,7 +13,7 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 
 [compat]
 CommonSolve = "0.2.4"
-ModelingToolkit = "10.26.1"
+ModelingToolkit = "10,11"
 OrdinaryDiffEq = "6.103.0"
 SciMLBase = "2.124.0"
 Setfield = "1.1.2"

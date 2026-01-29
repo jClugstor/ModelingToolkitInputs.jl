@@ -36,6 +36,20 @@ function Base.show(io::IO, mime::MIME"text/plain", sys::InputSystem)
     show(io, mime, get_system(sys))
 end
 
+equations(sys::InputSystem) = getfield(get_system(sys), :equations)
+parameters(sys::InputSystem) = getfield(get_system(sys), :parameters)
+unknowns(sys::InputSystem) = getfield(get_system(sys), :unknowns)
+
+for prop in ModelingToolkit.SYS_PROPS
+    fname_get = Symbol(:get_, prop)
+    fname_has = Symbol(:has_, prop)
+    @eval begin
+        export $fname_get, $fname_has
+        $fname_get(sys::InputSystem) = getfield(get_system(sys), $(QuoteNode(prop)))
+        $fname_has(sys::InputSystem) = isdefined(get_system(sys), $(QuoteNode(prop)))
+    end
+end
+
 function ModelingToolkit.mtkcompile(sys::InputSystem; inputs = Any[], kwargs...)
     sys = mtkcompile(get_system(sys); inputs, kwargs...)
     input_functions = nothing
@@ -160,7 +174,11 @@ function build_input_functions(sys, inputs)
                                        for x in ModelingToolkit.unwrap.(inputs)]
     setters = []
     events = ModelingToolkit.SymbolicDiscreteCallback[]
-    defaults = ModelingToolkit.get_defaults(sys)
+    defaults = if pkgversion(ModelingToolkit) > v"11"
+        ModelingToolkit.initial_conditions(sys)
+    else
+        ModelingToolkit.defaults(sys)
+    end
     
     input_functions = nothing
     if !isempty(vars)
@@ -172,13 +190,14 @@ function build_input_functions(sys, inputs)
 
             # ensure that the ODEProblem does not complain about missing parameter map
             if !haskey(defaults, x)
-                push!(defaults, x => 0.0)
+                # push!(defaults, x => 0.0)
+                defaults[x] = 0.0
             end
         end
 
         @set! sys.discrete_events = events
         @set! sys.index_cache = ModelingToolkit.IndexCache(sys)
-        @set! sys.defaults = defaults
+        # @set! sys.initial_conditions = initial_conditions
 
         setters = [SymbolicIndexingInterface.setsym(sys, x) for x in vars]
 
