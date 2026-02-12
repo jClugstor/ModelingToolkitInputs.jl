@@ -25,18 +25,32 @@ struct InputSystem
     input_functions::Union{InputFunctions,Nothing}
 end
 InputSystem(system::ModelingToolkit.System, input_functions=nothing) = InputSystem(system, input_functions)
-InputSystem(eqs::Union{ModelingToolkit.Equation, Vector{ModelingToolkit.Equation}}, args...; kwargs...) = InputSystem(System(eqs, args...;kwargs...))
+InputSystem(eqs::Union{ModelingToolkit.Equation,Vector{ModelingToolkit.Equation}}, args...; kwargs...) = InputSystem(System(eqs, args...; kwargs...))
 
 get_input_functions(x::InputSystem) = getfield(x, :input_functions)
 get_system(x::InputSystem) = getfield(x, :system)
 Base.getproperty(x::InputSystem, f::Symbol) = getproperty(get_system(x), f)
 
-function Base.show(io::IO, mime::MIME"text/plain", sys::InputSystem) 
+function Base.show(io::IO, mime::MIME"text/plain", sys::InputSystem)
     println(io, "InputSystem")
     show(io, mime, get_system(sys))
 end
 
-function ModelingToolkit.mtkcompile(sys::InputSystem; inputs = Any[], kwargs...)
+equations(sys::InputSystem) = getfield(get_system(sys), :equations)
+parameters(sys::InputSystem) = getfield(get_system(sys), :parameters)
+unknowns(sys::InputSystem) = getfield(get_system(sys), :unknowns)
+
+for prop in ModelingToolkit.SYS_PROPS
+    fname_get = Symbol(:get_, prop)
+    fname_has = Symbol(:has_, prop)
+    @eval begin
+        export $fname_get, $fname_has
+        $fname_get(sys::InputSystem) = getfield(get_system(sys), $(QuoteNode(prop)))
+        $fname_has(sys::InputSystem) = isdefined(get_system(sys), $(QuoteNode(prop)))
+    end
+end
+
+function ModelingToolkit.mtkcompile(sys::InputSystem; inputs=Any[], kwargs...)
     sys = mtkcompile(get_system(sys); inputs, kwargs...)
     input_functions = nothing
     if !isempty(inputs)
@@ -54,7 +68,7 @@ get_prob(x::InputProblem) = getfield(x, :prob)
 get_input_functions(x::InputProblem) = getfield(x, :input_functions)
 Base.getproperty(x::InputProblem, f::Symbol) = getproperty(get_prob(x), f)
 
-function Base.show(io::IO, mime::MIME"text/plain", sys::InputProblem) 
+function Base.show(io::IO, mime::MIME"text/plain", sys::InputProblem)
     println(io, "InputProblem")
     show(io, mime, get_prob(sys))
 end
@@ -96,7 +110,7 @@ Base.getproperty(x::InputIntegrator, f::Symbol) = getproperty(get_integrator(x),
 Base.getindex(x::InputIntegrator, f) = getindex(get_integrator(x), f)
 SciMLBase.reinit!(x::InputIntegrator) = reinit!(get_integrator(x))
 
-function Base.show(io::IO, mime::MIME"text/plain", sys::InputIntegrator) 
+function Base.show(io::IO, mime::MIME"text/plain", sys::InputIntegrator)
     println(io, "InputIntegrator")
     show(io, mime, get_integrator(sys))
 end
@@ -160,29 +174,34 @@ function build_input_functions(sys, inputs)
                                        for x in ModelingToolkit.unwrap.(inputs)]
     setters = []
     events = ModelingToolkit.SymbolicDiscreteCallback[]
-    defaults = ModelingToolkit.get_defaults(sys)
-    
+    defaults = if pkgversion(ModelingToolkit) > v"11"
+        ModelingToolkit.initial_conditions(sys)
+    else
+        ModelingToolkit.defaults(sys)
+    end
+
     input_functions = nothing
     if !isempty(vars)
         for x in vars
-            affect = ModelingToolkit.ImperativeAffect((m, o, c, i)->m, modified = (; x))
+            affect = ModelingToolkit.ImperativeAffect((m, o, c, i) -> m, modified=(; x))
             sdc = ModelingToolkit.SymbolicDiscreteCallback(Inf, affect)
 
             push!(events, sdc)
 
             # ensure that the ODEProblem does not complain about missing parameter map
             if !haskey(defaults, x)
-                push!(defaults, x => 0.0)
+                # push!(defaults, x => 0.0)
+                defaults[x] = 0.0
             end
         end
 
         @set! sys.discrete_events = events
         @set! sys.index_cache = ModelingToolkit.IndexCache(sys)
-        @set! sys.defaults = defaults
+        # @set! sys.initial_conditions = initial_conditions
 
         setters = [SymbolicIndexingInterface.setsym(sys, x) for x in vars]
 
-        input_functions =  InputFunctions(events, vars, setters)
+        input_functions = InputFunctions(events, vars, setters)
     end
 
     return sys, input_functions
@@ -209,7 +228,11 @@ function CommonSolve.solve(input_prob::InputProblem, args...; inputs::Vector{Inp
 
         # DiscreteCallback doesn't hit on t==0, workaround...
         if input.time[1] == 0
-            prob.ps[input.var] = input.data[1]
+            if pkgversion(ModelingToolkit) > v"11"
+                prob.ps[Initial(input.var)] = input.data[1]
+            else
+                prob.ps[input.var] = input.data[1]
+            end
         end
     end
 
@@ -220,7 +243,7 @@ function CommonSolve.solve(input_prob::InputProblem, args...; inputs::Vector{Inp
     push!(callbacks, DiscreteCallback(condition, affect!))
     push!(tstops, t_end)
 
-    return solve(prob, args...; tstops, callback = CallbackSet(callbacks...), kwargs...)
+    return solve(prob, args...; tstops, callback=CallbackSet(callbacks...), kwargs...)
 end
 
 

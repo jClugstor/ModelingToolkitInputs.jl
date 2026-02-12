@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    name: Julia ${{ matrix.version }} - MTK ${{ matrix.mtk_version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     env:
       MODERNGL_DEBUGGING: "true" # turn on errors when running OpenGL tests
     runs-on: ${{ matrix.os }}
@@ -25,6 +25,9 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        mtk_version:
+          - '10'
+          - '11'
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -33,5 +36,8 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
+      - name: Pin ModelingToolkit version
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.add(name="ModelingToolkit", version="${{ matrix.mtk_version }}")'
       - uses: julia-actions/julia-runtest@v1
 
