@@ -2,3 +2,4 @@ docs/build/
 docs/.vscode/
 .vscode/
 Manifest.toml
+scripts
