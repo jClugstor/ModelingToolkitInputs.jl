@@ -30,6 +30,7 @@ InputSystem(eqs::Union{ModelingToolkit.Equation,Vector{ModelingToolkit.Equation}
 get_input_functions(x::InputSystem) = getfield(x, :input_functions)
 get_system(x::InputSystem) = getfield(x, :system)
 Base.getproperty(x::InputSystem, f::Symbol) = getproperty(get_system(x), f)
+Base.propertynames(x::InputSystem) = propertynames(getfield(x, :system))
 
 function Base.show(io::IO, mime::MIME"text/plain", sys::InputSystem)
     println(io, "InputSystem")
