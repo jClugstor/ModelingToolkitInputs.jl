@@ -52,7 +52,7 @@ function Demo(;name)
 end
 
 @named demo = Demo()
-@mtkcompile sys=InputSystem(demo) inputs=ModelingToolkit.unbound_inputs(demo)
+sys = mtkcompile(InputSystem(demo); inputs=ModelingToolkit.unbound_inputs(demo))
 ```
 
 
