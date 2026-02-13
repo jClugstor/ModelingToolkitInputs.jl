@@ -82,3 +82,21 @@ eqs = [
 @mtkcompile sys = InputSystem(eqs, t, vars, []) inputs=[x1, x2]
 
 @test !isnothing(ModelingToolkitInputs.get_input_functions(sys))
+
+
+# ----------------------------
+# issue: 4
+@variables x(t)[1:5] [input=true]
+@variables y(t) = 0
+eqs = [D(y) ~ sum(x)]
+@mtkcompile sys=InputSystem(eqs, t, [x, y], []) inputs=[x]
+prob = ODEProblem(sys, [], (0, 4))
+
+times = collect(0:1:4)
+values = [ones(5)*i for i=1:5]
+x_input = Input(x, values, times)
+sol = solve(prob, Tsit5(); inputs=[x_input])
+
+@test sol[x[1]] == [1.0, 2.0, 3.0, 4.0, 5.0, 5.0]
+
+
