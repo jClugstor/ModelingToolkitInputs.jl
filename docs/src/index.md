@@ -55,6 +55,13 @@ end
 sys = mtkcompile(InputSystem(demo); inputs=ModelingToolkit.unbound_inputs(demo))
 ```
 
+Note, to call out the input specificly we must use `demo` with the namespace removed...
+
+```julia
+demo_ns = ModelingToolkit.toggle_namespacing(demo, false)
+sys = mtkcompile(InputSystem(demo); inputs=[demo_ns.x])
+```
+
 
 ## Indeterminate Form: Using ModelingToolkit with Streaming Data
 When input values need to be computed on-the-fly or depend on external data sources, you can manually set inputs while steping the integrator using `set_input!`.  
