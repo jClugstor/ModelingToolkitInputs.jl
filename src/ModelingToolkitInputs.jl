@@ -90,14 +90,16 @@ end
 Type used to provide data input for a `InputSystem`
 """
 struct Input
-    var::Num
+    var::Union{Num, Symbolics.Arr{Num, 1}}
     data::SVector
     time::SVector
 end
 
-function Input(var, data::Vector{<:Real}, time::Vector{<:Real})
+function Input(var, data::Vector, time::Vector)
     n = length(data)
-    return Input(var, SVector{n}(data), SVector{n}(time))
+    sdata = SVector{n}(data)
+    stime = SVector{n}(time)
+    return Input(var, sdata, stime)
 end
 
 struct InputIntegrator
@@ -122,7 +124,7 @@ CommonSolve.step!(input_integrator::InputIntegrator, args...; kwargs...) = step!
 
 # get_input_functions(sys::ModelingToolkit.AbstractSystem) = ModelingToolkit.get_gui_metadata(sys).layout
 
-function set_input!(input_funs::InputFunctions, integrator::SciMLBase.DEIntegrator, var, value::Real)
+function set_input!(input_funs::InputFunctions, integrator::SciMLBase.DEIntegrator, var, value::Union{Real, Vector{<:Real}})
     i = findfirst(isequal(var), input_funs.vars)
     setter = input_funs.setters[i]
     event = input_funs.events[i]
@@ -143,7 +145,7 @@ set_input!(integrator, sys.x, 1.0)
 step!(integrator, dt)
 ```
 """
-function set_input!(input_integrator::InputIntegrator, var, value::Real)
+function set_input!(input_integrator::InputIntegrator, var, value::Union{Real, Vector{<:Real}})
     set_input!(get_input_functions(input_integrator), get_integrator(input_integrator), var, value)
 end
 
@@ -162,7 +164,7 @@ Saves the final state of all discrete variables.  Call after the final step of t
 """
 finalize!(input_integrator::InputIntegrator) = finalize!(get_input_functions(input_integrator), get_integrator(input_integrator))
 
-function (input_funs::InputFunctions)(integrator, var, value::Real)
+function (input_funs::InputFunctions)(integrator, var, value::Union{Real, Vector{<:Real}})
     set_input!(input_funs, integrator, var, value)
 end
 (input_funs::InputFunctions)(integrator) = finalize!(input_funs, integrator)
@@ -183,7 +185,7 @@ function build_input_functions(sys, inputs)
 
     input_functions = nothing
     if !isempty(vars)
-        for x in vars
+        for (j,x) in enumerate(vars)
             affect = ModelingToolkit.ImperativeAffect((m, o, c, i) -> m, modified=(; x))
             sdc = ModelingToolkit.SymbolicDiscreteCallback(Inf, affect)
 
@@ -191,8 +193,11 @@ function build_input_functions(sys, inputs)
 
             # ensure that the ODEProblem does not complain about missing parameter map
             if !haskey(defaults, x)
-                # push!(defaults, x => 0.0)
-                defaults[x] = 0.0
+                if inputs[j] isa Symbolics.Arr
+                    defaults[x] = zeros(length(inputs[j]))
+                else
+                    defaults[x] = 0.0
+                end                
             end
         end
 
