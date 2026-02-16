@@ -230,7 +230,7 @@ function CommonSolve.solve(input_prob::InputProblem, args...; inputs::Vector{Inp
                 set_input!(input_functions, integrator, input.var, input.data[i])
             end
         end
-        push!(callbacks, DiscreteCallback(condition, affect!))
+        push!(callbacks, DiscreteCallback(condition, affect!, save_positions = (false, false)))
 
         # DiscreteCallback doesn't hit on t==0, workaround...
         if input.time[1] == 0
