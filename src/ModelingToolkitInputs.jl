@@ -241,7 +241,7 @@ function CommonSolve.solve(input_prob::InputProblem, args...; inputs::Vector{Inp
     affect! = function (integrator)
         # Update all inputs that have data at the current time
         for input::Input in inputs
-            i = findfirst(integrator.t .== input.time)
+            i = findfirst(==(integrator.t), input.time)
             if !isnothing(i)
                 @inbounds set_input!(input_functions, integrator, input.var, input.data[i])
             end
